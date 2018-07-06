@@ -103,7 +103,7 @@ void SPTPP::RunWrite()
         if (adr + count < size)
         {
             for (int i = 0; i < count; ++i)
-                obj[adr + i] = buffer[2 + i];
+                obj[adr + i] = buffer[3 + i];
 
             buffer[0] = 0x0f;
             buffer[1] = buffer[2];
