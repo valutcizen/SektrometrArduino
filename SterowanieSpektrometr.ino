@@ -54,7 +54,7 @@ void setup() {
   pinMode(serwo2EnkoderBPin, INPUT);
 
   Serial.begin(115200);
-  serwoLusterko.attach(serwoLusterkoPin);
+  serwoLusterko.attach(serwoLusterkoPin, 1, 2);
 }
 
 int serwoLusterkoPozycja = 0;
