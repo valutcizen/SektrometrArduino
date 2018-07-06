@@ -27,16 +27,17 @@ Servo serwoLusterko;
 #define StatusBitPIActive2 7
 
 struct DaneKomunikacja {
-  uint8_t Status = 0;
-  uint8_t UstawionyKatLusterko = 0;
-  int16_t AktualneImpulsy1 = 0;
-  int16_t AktualneImpulsy2 = 0;
-  int16_t UstawioneImpulsy1 = 0;
-  int16_t UstawioneImpulsy2 = 0;
-  uint16_t PredkoscMax1 = 0;
-  uint16_t PredkoscMax2 = 0;
-} Dane;
+  volatile uint8_t Status = 0;
+  volatile uint8_t UstawionyKatLusterko = 0;
+  volatile int16_t AktualneImpulsy1 = 0;
+  volatile int16_t AktualneImpulsy2 = 0;
+  volatile int16_t UstawioneImpulsy1 = 0;
+  volatile int16_t UstawioneImpulsy2 = 0;
+  volatile uint16_t PredkoscMax1 = 0;
+  volatile uint16_t PredkoscMax2 = 0;
+};
 
+volatile DaneKomunikacja Dane;
 SPTPP DaneProtokol((uint8_t*)(&Dane), (int)sizeof(DaneKomunikacja), 20ul);
 
 void setup() {

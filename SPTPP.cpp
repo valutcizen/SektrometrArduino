@@ -81,9 +81,9 @@ void SPTPP::RunRead()
                 buffer[2 + i] = obj[adr + i];
             
             uint8_t* cs = Fletcher16(buffer, count + 2);
-            buffer[count] = cs[0];
-            buffer[count+1] = cs[1];
-            Serial.write(buffer, count + 2);
+            buffer[count+2] = cs[0];
+            buffer[count+3] = cs[1];
+            Serial.write(buffer, count + 4);
         }
         else
             SendReadError();
