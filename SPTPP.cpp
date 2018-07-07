@@ -74,16 +74,18 @@ void SPTPP::RunRead()
 
         if (adr + count < size)
         {
-            buffer[0] = 0x55;
-            buffer[1] = buffer[2];
+            uint8_t* buf = new uint8_t[count + 4];
+
+            buf[0] = 0x55;
+            buf[1] = buffer[2];
 
             for (int i = 0; i < count; ++i)
-                buffer[2 + i] = obj[adr + i];
+                buf[2 + i] = obj[adr + i];
             
-            uint8_t* cs = Fletcher16(buffer, count + 2);
-            buffer[count+2] = cs[0];
-            buffer[count+3] = cs[1];
-            Serial.write(buffer, count + 4);
+            uint8_t* cs = Fletcher16(buf, count + 2);
+            buf[count+2] = cs[0];
+            buf[count+3] = cs[1];
+            Serial.write(buf, count + 4);
         }
         else
             SendReadError();
@@ -129,14 +131,16 @@ void SPTPP::CheckNextBuffPosition()
         if (buffer[i] == 0xf0)
         {
             SetNewBuffer(i);
-            if (i < pos - 1 && buffer[i + 1] + 5 >= pos)
+            if (pos > 1 && buffer[1] + 5 >= pos)
                 RunWrite();
+            return;
         }
         else if (i >= pos - 5 && buffer[i] == 0xaa)
         {
             SetNewBuffer(i);
-            if (i == pos - 5)
+            if (pos == 5)
                 RunRead();
+            return;
         }
     }
 }
