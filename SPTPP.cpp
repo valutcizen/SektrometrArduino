@@ -86,6 +86,7 @@ void SPTPP::RunRead()
             buf[count+2] = cs[0];
             buf[count+3] = cs[1];
             Serial.write(buf, count + 4);
+            Serial.flush();
         }
         else
             SendReadError();
@@ -114,6 +115,7 @@ void SPTPP::RunWrite()
             buffer[3] = cs[1];
 
             Serial.write(buffer, 4);
+            Serial.flush();
         }
         else
             SendWriteError();
@@ -157,12 +159,14 @@ void SPTPP::SetNewBuffer(int p)
 
 void SPTPP::SendReadError()
 {
-    uint8_t buf[4] = {0x55, 0x00, 0x55, 0x55};
+    uint8_t buf[4] = {0x55, 0x00, 0x55, 0xAA};
     Serial.write(buf, 4);
+    Serial.flush();
 }
 
 void SPTPP::SendWriteError()
 {
-    uint8_t buf[4] = {0xf0, 0x00, 0xf0, 0xf0};
+    uint8_t buf[4] = {0xf0, 0x00, 0x0F, 0x1E};
     Serial.write(buf, 4);
+    Serial.flush();
 }
