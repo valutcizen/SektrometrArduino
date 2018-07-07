@@ -1,21 +1,24 @@
 #include <Servo.h>
+#include <Encoder.h>
 #include "SPTPP.h"
 
 //KONFIGURACJA
 #define serwoLusterkoPin 2
-#define serwo1PwmPin 3
-#define serwo1KierunekLewoPin 5
-#define serwo1KierunekPrawoPin 6
-#define serwo1EnkoderAPin 9
-#define serwo1EnkoderBPin 10
-#define serwo2PwmPin 4
-#define serwo2KierunekLewoPin 7
-#define serwo2KierunekPrawoPin 8
-#define serwo2EnkoderAPin 11
-#define serwo2EnkoderBPin 12
+#define serwo1PwmPin 4
+#define serwo1KierunekLewoPin 6
+#define serwo1KierunekPrawoPin 7
+#define serwo1EnkoderAPin 18
+#define serwo1EnkoderBPin 19
+#define serwo2PwmPin 5
+#define serwo2KierunekLewoPin 8
+#define serwo2KierunekPrawoPin 9
+#define serwo2EnkoderAPin 20
+#define serwo2EnkoderBPin 21
 
 //PROGRAM
 Servo serwoLusterko;
+Encoder enkoder1(serwo1EnkoderAPin, serwo1EnkoderBPin);
+Encoder enkoder2(serwo2EnkoderAPin, serwo2EnkoderBPin);
 
 #define StatusBitPozycjonowanie1 0
 #define StatusBitPozycjonowanie2 1
@@ -45,26 +48,38 @@ void setup() {
   pinMode(serwo1PwmPin, OUTPUT);
   pinMode(serwo1KierunekLewoPin, OUTPUT);
   pinMode(serwo1KierunekPrawoPin, OUTPUT);
-  pinMode(serwo1EnkoderAPin, INPUT);
-  pinMode(serwo1EnkoderBPin, INPUT);
+  pinMode(serwo1EnkoderAPin, INPUT_PULLUP);
+  pinMode(serwo1EnkoderBPin, INPUT_PULLUP);
   pinMode(serwo2PwmPin, OUTPUT);
   pinMode(serwo2KierunekLewoPin, OUTPUT);
   pinMode(serwo2KierunekPrawoPin, OUTPUT);
-  pinMode(serwo2EnkoderAPin, INPUT);
-  pinMode(serwo2EnkoderBPin, INPUT);
+  pinMode(serwo2EnkoderAPin, INPUT_PULLUP);
+  pinMode(serwo2EnkoderBPin, INPUT_PULLUP);
+
+  digitalWrite(serwo1EnkoderAPin, HIGH);
+  digitalWrite(serwo1EnkoderBPin, HIGH);
+  digitalWrite(serwo2EnkoderAPin, HIGH);
+  digitalWrite(serwo2EnkoderBPin, HIGH);
 
   Serial.begin(115200);
   serwoLusterko.attach(serwoLusterkoPin, 1, 2);
+  enkoder1.write(0);
+  enkoder2.write(0);
 }
 
 int serwoLusterkoPozycja = 0;
-uint16_t serwo1Pwm = 90;
-uint16_t serwo2Pwm = 90;
 
 void loop() {
   serwoLusterkoPozycja = constrain(Dane.UstawionyKatLusterko, 0, 180);
-  serwoLusterko.write(serwoLusterkoPozycja);
-  delay(15);
+  if (serwoLusterko.read() != serwoLusterkoPozycja)
+    serwoLusterko.write(serwoLusterkoPozycja);
+
+  Dane.AktualneImpulsy1 = enkoder1.read();
+  Dane.AktualneImpulsy2 = enkoder2.read();
+
+  //Dyskretny kontroler PI: https://www.embeddedrelated.com/showarticle/121.php
+  
+  delay(20);
 }
 
 void serialEvent(){
