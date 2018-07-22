@@ -2,7 +2,7 @@
 #include <Encoder.h>
 #include "SPTPP.h"
 
-//KONFIGURACJA
+//Konfiguracja pinów sterowania
 #define serwoLusterkoPin 10
 #define serwo1PwmPin 5
 #define serwo1KierunekLewoPin 11
@@ -23,6 +23,22 @@
 #define PinO2 A3
 #define PinO3 A4
 #define PinO4 13
+//Konfiguracja pozycjonowania
+#define Pozycjonowanie1Lewo
+#define Pozycjonowanie2Lewo
+#define PredkoscPozycjonowanie1 20
+#define PredkoscPozycjonowanie2 20
+#define Pozycjonowanie1Timeout 200
+#define Pozycjonowanie2Timeout 200
+//Konfiguracja sterowania - Kp numerator, Kp denumerator, Ki, Ti in miliseconds
+#define Kn1 10
+#define Kd1 100
+#define Ki1 1
+#define Ti1 20
+#define Kn2 10
+#define Kd2 100
+#define Ki2 1
+#define Ti2 20
 
 //PROGRAM
 Servo serwoLusterko;
@@ -34,18 +50,18 @@ Encoder enkoder2(serwo2EnkoderAPin, serwo2EnkoderBPin);
 #define StatusBitJazdaLewo1 2
 #define StatusBitJazdaPrawo1 3
 #define StatusBitJazdaLewo2 4
-#define StatusBitJazdaPrawo3 5
+#define StatusBitJazdaPrawo2 5
 #define StatusBitPIActive1 6
 #define StatusBitPIActive2 7
 
 struct DaneKomunikacja {
   volatile uint8_t Status = 0;
-  volatile int16_t AktualneImpulsy1 = 0;
-  volatile int16_t AktualneImpulsy2 = 0;
+  volatile int32_t AktualneImpulsy1 = 0;
+  volatile int32_t AktualneImpulsy2 = 0;
   volatile uint8_t PortyIO = 0;
   volatile uint8_t UstawionyKatLusterko = 0;
-  volatile int16_t UstawioneImpulsy1 = 0;
-  volatile int16_t UstawioneImpulsy2 = 0;
+  volatile int32_t UstawioneImpulsy1 = 0;
+  volatile int32_t UstawioneImpulsy2 = 0;
   volatile uint16_t PredkoscMax1 = 0;
   volatile uint16_t PredkoscMax2 = 0;
 };
@@ -86,36 +102,222 @@ void setup() {
 
   Serial.begin(115200);
   serwoLusterko.attach(serwoLusterkoPin, 1, 2);
-  enkoder1.write(0);
-  enkoder2.write(0);
+  RozpocznijPozycjonowanieSerwGalek();
 }
 
 int serwoLusterkoPozycja = 0;
+unsigned long lastReadTime = 0;
 
 void loop() {
   serwoLusterkoPozycja = constrain(Dane.UstawionyKatLusterko, 0, 180);
   if (serwoLusterko.read() != serwoLusterkoPozycja)
     serwoLusterko.write(serwoLusterkoPozycja);
 
-  Dane.AktualneImpulsy1 = enkoder1.read();
-  Dane.AktualneImpulsy2 = enkoder2.read();
+  ObsluzSerwaGalek();
 
   ObsluzIO();
-
-  //Dyskretny kontroler PI: https://www.embeddedrelated.com/showarticle/121.php
   
   delay(20);
 }
 
-void serialEvent(){
+unsigned long serwo1LastChange = 0;
+unsigned long serwo2LastChange = 0;
+inline void RozpocznijPozycjonowanieSerwGalek()
+{
+  bitSet(Dane.Status, StatusBitPozycjonowanie1);
+  bitSet(Dane.Status, StatusBitPozycjonowanie2);
+
+#ifdef Pozycjonowanie1Lewo
+  bitSet(Dane.Status, StatusBitJazdaLewo1);
+  bitClear(Dane.Status, StatusBitJazdaPrawo1);
+  digitalWrite(serwo1KierunekLewoPin, HIGH);
+  digitalWrite(serwo1KierunekPrawoPin, LOW);
+#else
+  bitClear(Dane.Status, StatusBitJazdaLewo1);
+  bitSet(Dane.Status, StatusBitJazdaPrawo1);
+  digitalWrite(serwo1KierunekLewoPin, LOW);
+  digitalWrite(serwo1KierunekPrawoPin, HIGH);
+#endif
+
+#ifdef Pozycjonowanie2Lewo
+  bitSet(Dane.Status, StatusBitJazdaLewo2);
+  bitClear(Dane.Status, StatusBitJazdaPrawo2);
+  digitalWrite(serwo2KierunekLewoPin, HIGH);
+  digitalWrite(serwo2KierunekPrawoPin, LOW);
+#else
+  bitClear(Dane.Status, StatusBitJazdaLewo2);
+  bitSet(Dane.Status, StatusBitJazdaPrawo2);
+  digitalWrite(serwo2KierunekLewoPin, LOW);
+  digitalWrite(serwo2KierunekPrawoPin, HIGH);
+#endif
+
+  analogWrite(serwo1PwmPin, PredkoscPozycjonowanie1);
+  analogWrite(serwo2PwmPin, PredkoscPozycjonowanie2);
+
+  lastReadTime = millis();
+  serwo1LastChange = lastReadTime;
+  serwo2LastChange = lastReadTime;
+}
+
+unsigned long noweReadTime = 0;
+unsigned long roznicaCzasu = 0;
+int32_t staraPozycja1 = 0;
+int32_t staraPozycja2 = 0;
+int32_t roznicaPozycja1 = 0;
+int32_t roznicaPozycja2 = 0;
+int32_t e = 0;
+unsigned long dt = 0;
+int32_t predkosc = 0;
+int16_t state1 = 0;
+int16_t state2 = 0;
+
+inline void ObsluzSerwaGalek()
+{
+  noweReadTime = millis();
+  if (noweReadTime == lastReadTime)
+    return;
+
+  roznicaCzasu = noweReadTime - lastReadTime;
+  lastReadTime = noweReadTime;
+  staraPozycja1 = Dane.AktualneImpulsy1;
+  staraPozycja2 = Dane.AktualneImpulsy2;
+  Dane.AktualneImpulsy1 = enkoder1.read();
+  Dane.AktualneImpulsy2 = enkoder2.read();
+  roznicaPozycja1 = Dane.AktualneImpulsy1 - staraPozycja1;
+  roznicaPozycja2 = Dane.AktualneImpulsy2 - staraPozycja2;
+
+  if (bitRead(Dane.Status, StatusBitPozycjonowanie1))
+  {
+    if (roznicaPozycja1 == 0)
+    {
+      if (noweReadTime - serwo1LastChange > Pozycjonowanie1Timeout)
+        ZakonczPozycjonowanie1();
+    }
+    else
+      serwo1LastChange = noweReadTime;
+  }
+  else
+  {
+    e = Dane.UstawioneImpulsy1 - Dane.AktualneImpulsy1;
+    if (e == 0)
+      UstawSerwo1(0, false);
+    else if (abs(e) * Kn1 / Kd1 > Dane.PredkoscMax1)
+    {
+      UstawSerwo1(Dane.PredkoscMax1, e > 0);
+      state1 = 0;
+    }
+    else
+    {
+      dt = noweReadTime - serwo1LastChange;
+      state1 = constrain(state1 + e * dt, INT16_MIN, INT16_MAX);
+      predkosc = e * Kn1 / Kd1 + state1 * Ki1 / Ti1;
+      UstawSerwo1(abs(predkosc), predkosc > 0);
+    }
+    serwo1LastChange = noweReadTime;
+  }
+
+  if (bitRead(Dane.Status, StatusBitPozycjonowanie2))
+  {
+    if (roznicaPozycja2 == 0)
+    {
+      if (noweReadTime - serwo2LastChange > Pozycjonowanie2Timeout)
+        ZakonczPozycjonowanie2();
+    }
+    else
+      serwo2LastChange = noweReadTime;
+  }
+  else
+  {
+    e = Dane.UstawioneImpulsy2 - Dane.AktualneImpulsy2;
+    if (e == 0)
+      UstawSerwo2(0, false);
+    else if (abs(e) * Kn2 / Kd2 > Dane.PredkoscMax2)
+    {
+      UstawSerwo2(Dane.PredkoscMax2, e > 0);
+      state2 = 0;
+    }
+    else
+    {
+      dt = noweReadTime - serwo2LastChange;
+      state2 = constrain(state2 + e * dt, INT16_MIN, INT16_MAX);
+      predkosc = e * Kn2 / Kd2 + state2 * Ki2 / Ti2;
+      UstawSerwo2(abs(predkosc), predkosc > 0);
+    }
+    serwo2LastChange = noweReadTime;
+  }
+}
+
+inline void UstawSerwo1(int predkosc, bool czyLewo)
+{
+  analogWrite(serwo1PwmPin, predkosc);
+  if (predkosc == 0)
+  {
+    digitalWrite(serwo1KierunekLewoPin, LOW);
+    digitalWrite(serwo1KierunekPrawoPin, LOW);
+  }
+  else if (czyLewo)
+  {
+    digitalWrite(serwo1KierunekLewoPin, HIGH);
+    digitalWrite(serwo1KierunekPrawoPin, LOW);
+  }
+  else
+  {
+    digitalWrite(serwo1KierunekLewoPin, LOW);
+    digitalWrite(serwo1KierunekPrawoPin, HIGH);
+  }
+}
+
+inline void UstawSerwo2(int predkosc, bool czyLewo)
+{
+  analogWrite(serwo2PwmPin, predkosc);
+  if (predkosc == 0)
+  {
+    digitalWrite(serwo2KierunekLewoPin, LOW);
+    digitalWrite(serwo2KierunekPrawoPin, LOW);
+  }
+  else if (czyLewo)
+  {
+    digitalWrite(serwo2KierunekLewoPin, HIGH);
+    digitalWrite(serwo2KierunekPrawoPin, LOW);
+  }
+  else
+  {
+    digitalWrite(serwo2KierunekLewoPin, LOW);
+    digitalWrite(serwo2KierunekPrawoPin, HIGH);
+  }
+}
+
+inline void ZakonczPozycjonowanie1()
+{
+  analogWrite(serwo1PwmPin, 0);
+  bitClear(Dane.Status, StatusBitJazdaLewo1);
+  bitClear(Dane.Status, StatusBitJazdaPrawo1);
+  digitalWrite(serwo1KierunekLewoPin, LOW);
+  digitalWrite(serwo1KierunekPrawoPin, LOW);
+  enkoder1.write(0);
+  serwo1LastChange = noweReadTime;
+}
+
+inline void ZakonczPozycjonowanie2()
+{
+  analogWrite(serwo2PwmPin, 0);
+  bitClear(Dane.Status, StatusBitJazdaLewo2);
+  bitClear(Dane.Status, StatusBitJazdaPrawo2);
+  digitalWrite(serwo2KierunekLewoPin, LOW);
+  digitalWrite(serwo2KierunekPrawoPin, LOW);
+  enkoder2.write(0);
+  serwo2LastChange = noweReadTime;
+}
+
+void serialEvent()
+{
   while (Serial.available())
     DaneProtokol.GetedByte((uint8_t)Serial.read());
 }
 
-
 #define ReadPin(value, pin, b) if (digitalRead((pin))) bitSet((value), (b)); else bitClear((value), (b));
 #define WritePin(value, pin, b) if (bitRead((value),(b))) digitalWrite((pin), HIGH); else digitalWrite((pin), LOW);
-void ObsluzIO()
+inline void ObsluzIO()
 {
   uint8_t x = Dane.PortyIO;
   ReadPin(x,PinI1,0);
