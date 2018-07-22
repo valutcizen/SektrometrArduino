@@ -3,26 +3,26 @@
 #include "SPTPP.h"
 
 //KONFIGURACJA
-#define serwoLusterkoPin 2
-#define serwo1PwmPin 4
-#define serwo1KierunekLewoPin 6
-#define serwo1KierunekPrawoPin 7
-#define serwo1EnkoderAPin 18
-#define serwo1EnkoderBPin 19
-#define serwo2PwmPin 5
+#define serwoLusterkoPin 10
+#define serwo1PwmPin 5
+#define serwo1KierunekLewoPin 11
+#define serwo1KierunekPrawoPin 12
+#define serwo1EnkoderAPin 3
+#define serwo1EnkoderBPin 4
+#define serwo2PwmPin 6
 #define serwo2KierunekLewoPin 8
 #define serwo2KierunekPrawoPin 9
-#define serwo2EnkoderAPin 20
-#define serwo2EnkoderBPin 21
+#define serwo2EnkoderAPin 2
+#define serwo2EnkoderBPin 7
 //Konfiguracja uniwersalnych wejść / wyjść
-#define PinI1 10
-#define PinI2 11
-#define PinI3 12
-#define PinI4 3
-#define PinO1 14
-#define PinO2 15
-#define PinO3 16
-#define PinO4 17
+#define PinI1 A0
+#define PinI2 A0
+#define PinI3 A1
+#define PinI4 A1
+#define PinO1 A2
+#define PinO2 A3
+#define PinO3 A4
+#define PinO4 13
 
 //PROGRAM
 Servo serwoLusterko;
