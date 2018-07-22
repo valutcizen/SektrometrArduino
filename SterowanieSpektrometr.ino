@@ -18,7 +18,7 @@
 #define PinI1 A0
 #define PinI2 A1
 #define PinI3 A5
-#define PinI4 A6
+#define PinI4 A5
 #define PinO1 A2
 #define PinO2 A3
 #define PinO3 A4
