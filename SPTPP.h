@@ -31,6 +31,7 @@ class SPTPP {
         uint8_t* obj;
         int size, pos, actSize;
         uint8_t* buffer;
+        uint8_t* writeBuffer;
         unsigned long lastTime, timeout;
 
         int CheckFletcher16( uint8_t *data, int count );

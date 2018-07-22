@@ -6,6 +6,7 @@ SPTPP::SPTPP(uint8_t* obj, int size, unsigned long timeout)
     this->size = size;
     this->timeout = timeout;
     buffer = new uint8_t[size + 5];
+    writeBuffer = new uint8_t[size + 5];
     pos = 0;
 }
 
@@ -43,26 +44,31 @@ void SPTPP::GetedByte(uint8_t b)
 
 int SPTPP::CheckFletcher16( uint8_t *data, int count )
 {
-    uint8_t* cs = Fletcher16(data, count);
-    return cs[0] == data[count] && cs[1] == data[count + 1];
+    uint16_t sum1 = 0;
+    uint16_t sum2 = 0;
+
+    for(int index = 0; index < count; ++index )
+    {
+        sum1 = (sum1 + data[index]) % 255;
+        sum2 = (sum2 + sum1) % 255;
+    }
+
+    return data[count] == (uint8_t)sum1 && data[count + 1] == (uint8_t)sum2;
 }
 
 uint8_t* SPTPP::Fletcher16( uint8_t *data, int count )
 {
     uint16_t sum1 = 0;
     uint16_t sum2 = 0;
-    int index;
 
-    for( index = 0; index < count; ++index )
+    for(int index = 0; index < count; ++index )
     {
         sum1 = (sum1 + data[index]) % 255;
         sum2 = (sum2 + sum1) % 255;
     }
 
-    uint8_t* res = new uint8_t[2];
-    res[0] = (uint8_t)sum1;
-    res[1] = (uint8_t)sum2;
-    return res;
+    data[count] = (uint8_t)sum1;
+    data[count + 1] = (uint8_t)sum2;
 }
 
 void SPTPP::RunRead()
@@ -74,18 +80,14 @@ void SPTPP::RunRead()
 
         if (adr + count < size)
         {
-            uint8_t* buf = new uint8_t[count + 4];
-
-            buf[0] = 0x55;
-            buf[1] = buffer[2];
+            writeBuffer[0] = 0x55;
+            writeBuffer[1] = buffer[2];
 
             for (int i = 0; i < count; ++i)
-                buf[2 + i] = obj[adr + i];
+                writeBuffer[2 + i] = obj[adr + i];
             
-            uint8_t* cs = Fletcher16(buf, count + 2);
-            buf[count+2] = cs[0];
-            buf[count+3] = cs[1];
-            Serial.write(buf, count + 4);
+            Fletcher16(writeBuffer, count + 2);
+            Serial.write(writeBuffer, count + 4);
             Serial.flush();
         }
         else
@@ -108,13 +110,11 @@ void SPTPP::RunWrite()
             for (int i = 0; i < count; ++i)
                 obj[adr + i] = buffer[3 + i];
 
-            buffer[0] = 0x0f;
-            buffer[1] = buffer[2];
-            uint8_t* cs = Fletcher16(buffer, 2);
-            buffer[2] = cs[0];
-            buffer[3] = cs[1];
+            writeBuffer[0] = 0x0f;
+            writeBuffer[1] = buffer[2];
+            Fletcher16(writeBuffer, 2);
 
-            Serial.write(buffer, 4);
+            Serial.write(writeBuffer, 4);
             Serial.flush();
         }
         else
@@ -159,14 +159,20 @@ void SPTPP::SetNewBuffer(int p)
 
 void SPTPP::SendReadError()
 {
-    uint8_t buf[4] = {0x55, 0x00, 0x55, 0xAA};
-    Serial.write(buf, 4);
+    writeBuffer[0] = 0x55;
+    writeBuffer[1] = 0x00;
+    writeBuffer[2] = 0x55;
+    writeBuffer[3] = 0xAA;
+    Serial.write(writeBuffer, 4);
     Serial.flush();
 }
 
 void SPTPP::SendWriteError()
 {
-    uint8_t buf[4] = {0xf0, 0x00, 0x0F, 0x1E};
-    Serial.write(buf, 4);
+    writeBuffer[0] = 0x0F;
+    writeBuffer[1] = 0x00;
+    writeBuffer[2] = 0x0F;
+    writeBuffer[3] = 0x1E;
+    Serial.write(writeBuffer, 4);
     Serial.flush();
 }
